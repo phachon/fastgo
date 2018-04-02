@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"html/template"
 	"mime/multipart"
+	"path"
+	"strings"
 )
 
 type ControllerInterface interface {
@@ -44,7 +46,7 @@ func (controller *Controller) After() {
 
 // render view response
 func (controller *Controller) Render(path string) {
-	controller.Ctx.Response.Header.Set("Content-Type", "text/html;charset=utf-8")
+	controller.Ctx.SetContentType("text/html;charset=utf-8")
 	t, err := template.ParseFiles(ViewPath +"/"+ path + TemplateSuffix)
 	if err != nil {
 		Log.Errorf("template %s parese error %s", ViewPath+"/"+path, err.Error())
@@ -56,7 +58,7 @@ func (controller *Controller) Render(path string) {
 
 // return json
 func (controller *Controller) ReturnJson(body interface{}) {
-	controller.Ctx.SetContentType("Content-Type", "application/json")
+	controller.Ctx.SetContentType("application/json;charset=utf-8")
 	jsonByte, err := json.Marshal(body)
 	if err != nil {
 		controller.Ctx.SetBodyString(err.Error())
@@ -70,7 +72,7 @@ func (controller *Controller) GetString(key string, def string) string {
 	if string(controller.Ctx.FormValue(key)) == "" {
 		return def
 	}else {
-		return key
+		return string(controller.Ctx.FormValue(key))
 	}
 }
 
@@ -170,7 +172,7 @@ func (controller *Controller) GetUInt64(key string, def uint64) (uint64, error) 
 		return def, nil
 	}
 	i64, err := strconv.ParseInt(str, 10, 8)
-	return i64, err
+	return uint64(i64), err
 }
 
 // get request content text float64
@@ -186,12 +188,15 @@ func (controller *Controller) GetFile(key string) (*multipart.FileHeader, error)
 }
 
 // request is ajax
-func (controller *Controller) IsAjax() {
-	controller.Ctx.Request.Header.Peek("X-Requested-With") == "XMLHttpRequest"
+func (controller *Controller) IsAjax() bool {
+	return string(controller.Ctx.Request.Header.Peek("X-Requested-With")) == "XMLHttpRequest"
 }
 
 // static file
 func (controller *Controller) Static() {
-	fsHandler := fasthttp.FSHandler("/", 0)
+
+	baseName := path.Base(StaticPath)
+	dir := strings.TrimRight(StaticPath, baseName)
+	fsHandler := fasthttp.FSHandler(dir, 0)
 	fsHandler(controller.Ctx)
 }

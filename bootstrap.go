@@ -9,6 +9,7 @@ import (
 	"github.com/kataras/go-sessions"
 	"time"
 	"github.com/valyala/fasthttp"
+	"path"
 )
 
 var (
@@ -16,7 +17,7 @@ var (
 )
 
 var (
-	AppVersion = "v1.0"
+	Version = "v0.1"
 
 	Conf = viper.New()
 
@@ -33,9 +34,11 @@ var (
 	TemplateSuffix = ".html"
 
 	Session = &sessions.Sessions{}
+
+	Route = NewRouter()
 )
 
-// 启动初始化
+// start init
 func init()  {
 	initFlag()
 	initConfig()
@@ -92,7 +95,7 @@ func initPath() {
 
 func initSession()  {
 	Session = sessions.New(sessions.Config{
-		Cookie: "cardssionid",
+		Cookie: "fastgossionid",
 		Expires: time.Hour * 2,
 		DisableSubdomainPersistence: false,
 	})
@@ -110,14 +113,18 @@ func SetTemplateSuffix(suffix string)  {
 	TemplateSuffix = suffix
 }
 
-func Run() {
+func ListenAndServe(addr string, route *Router)  {
 
-	AddRouter("GET", "/static/*path", NewController, "Static")
+	route.Add("GET", "/"+path.Base(StaticPath)+"/*path", NewController(), "Static")
+	Log.Infof("start listen server %s", addr)
+	err := fasthttp.ListenAndServe(addr, route.fastHttpRouter.Handler)
+	if err != nil {
+		Log.Infof("listen server %s error: %s", addr, err.Error())
+	}
+}
+
+func Run() {
 	// start listen server
 	server := Conf.GetString("listen.server")
-	Log.Info("start listen server "+server)
-	err := fasthttp.ListenAndServe(server, router.Handler)
-	if err != nil {
-		Log.Info("listen server "+server+" error :"+err.Error())
-	}
+	ListenAndServe(server, Route)
 }
