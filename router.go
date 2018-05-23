@@ -4,6 +4,7 @@ import (
 	"github.com/buaazp/fasthttprouter"
 	"github.com/valyala/fasthttp"
 	"reflect"
+	"strings"
 )
 
 type Router struct {
@@ -21,7 +22,7 @@ func (r *Router) Add(requestMethod, path string, controller ControllerInterface,
 }
 
 // GET Request
-func (r *Router) Get(path string, controller ControllerInterface, action string) {
+func (r *Router) GET(path string, controller ControllerInterface, action string) {
 	r.Add("GET", path, controller, action)
 }
 
@@ -65,8 +66,25 @@ func (r *Router) controllerHandle(c ControllerInterface, action string) fasthttp
 	return fasthttp.RequestHandler(func(ctx *fasthttp.RequestCtx) {
 		vc := reflect.ValueOf(c)
 		vt := reflect.TypeOf(c)
+		if !vc.IsValid() || vt == nil {
+			ctx.SetStatusCode(404)
+			ctx.SetBodyString("404 Not found")
+			return
+		}
+		controllerName := ""
+		list := strings.Split(vt.String(), ".")
+		if len(list) >= 1 {
+			controllerName = list[1]
+		}else {
+			controllerName = list[0]
+		}
+		c.Init(ctx, controllerName, action)
 		method := vc.MethodByName(action)
-		c.Init(ctx, vt.Name(), action)
+		if !method.IsValid() {
+			ctx.SetStatusCode(404)
+			ctx.SetBodyString("404 Not found")
+			return
+		}
 		c.Before()
 		method.Call(nil)
 		c.After()

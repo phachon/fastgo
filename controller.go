@@ -9,6 +9,8 @@ import (
 	"path"
 	"strings"
 	"bytes"
+	"github.com/phachon/fasthttpsession"
+	"time"
 )
 
 type ControllerInterface interface {
@@ -26,6 +28,7 @@ type Controller struct {
 	ControllerName string
 	ActionName string
 	Data map[string]interface{}
+	Session fasthttpsession.SessionStore
 }
 
 // init controller
@@ -34,6 +37,12 @@ func (controller *Controller) Init(ctx *fasthttp.RequestCtx, controllerName stri
 	controller.ControllerName = controllerName
 	controller.ActionName = actionName
 	controller.Data = map[string]interface{}{}
+
+	var err error
+	controller.Session, err = Session.Start(ctx)
+	if err != nil {
+		panic("session start error, "+err.Error())
+	}
 }
 
 // controller before
@@ -44,6 +53,10 @@ func (controller *Controller) Before() {
 // controller after
 func (controller *Controller) After() {
 	// todo controller after
+	err := controller.Session.Save(controller.Ctx)
+	if err != nil {
+		panic("session save error, "+err.Error())
+	}
 }
 
 // render view response
@@ -90,6 +103,12 @@ func (controller *Controller) ReturnJson(body interface{}) {
 	} else {
 		controller.Ctx.SetBody(jsonByte)
 	}
+}
+
+// return error
+func (controller *Controller) ReturnError(status int, message string) {
+	controller.Ctx.SetStatusCode(status)
+	controller.Ctx.SetBodyString(message)
 }
 
 // get request ctx string
@@ -215,6 +234,67 @@ func (controller *Controller) GetFile(key string) (*multipart.FileHeader, error)
 // request is ajax
 func (controller *Controller) IsAjax() bool {
 	return string(controller.Ctx.Request.Header.Peek("X-Requested-With")) == "XMLHttpRequest"
+}
+
+func (controller *Controller) SetCookie(name string, value string, others ...interface{}) {
+	cookie := fasthttp.AcquireCookie()
+	defer fasthttp.ReleaseCookie(cookie)
+
+	cookie.SetKey(name)
+	cookie.SetHTTPOnly(true)
+	// 1. expires
+	if len(others) > 0 {
+		var expires int64
+		switch v := others[0].(type) {
+		case int:
+			expires = int64(v)
+		case int32:
+			expires = int64(v)
+		case int64:
+			expires = v
+		}
+		switch {
+		case expires > 0:
+			cookie.SetExpire(time.Now().Add(time.Duration(expires) * time.Second))
+		case expires < 0:
+			cookie.SetExpire(fasthttp.CookieExpireUnlimited)
+		}
+	}
+	// 2. path
+	if len(others) > 1 {
+		if v, ok := others[1].(string); ok && len(v) > 0 {
+			cookie.SetPath(v)
+		}
+	} else {
+		cookie.SetPath("/")
+	}
+	// 3. domain
+	if len(others) > 2 {
+		if v, ok := others[2].(string); ok && len(v) > 0 {
+			cookie.SetDomain(v)
+		}
+	}
+	// 4. secure
+	if len(others) > 3 {
+		if v, ok := others[2].(bool); ok && v && controller.Ctx.IsTLS() {
+			controller.Ctx.IsTLS()
+		}
+	}
+
+	cookie.SetValue(value)
+	controller.Ctx.Response.Header.SetCookie(cookie)
+}
+
+func (controller *Controller) GetCookie(key string) []byte {
+	return controller.Ctx.Request.Header.Cookie(key)
+}
+
+func (controller *Controller) GetCookieString(key string) string {
+	return string(controller.Ctx.Request.Header.Cookie(key))
+}
+
+func (controller *Controller) UserAgent() string {
+	return string(controller.Ctx.Request.Header.UserAgent())
 }
 
 // static file

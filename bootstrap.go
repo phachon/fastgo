@@ -8,6 +8,8 @@ import (
 	"github.com/valyala/fasthttp"
 	"path"
 	"github.com/phachon/fasthttpsession"
+	"flag"
+	"github.com/phachon/fasthttpsession/memory"
 )
 
 var (
@@ -32,11 +34,23 @@ var (
 	Route = NewRouter()
 )
 
+var (
+	confType = flag.String("conf-type", "toml", "please input config type!")
+	conf = flag.String("conf", "config.toml", "please input config file!")
+)
+
 // start init
 func init()  {
+	initFlag()
 	initPath()
-	initDefaultConf()
+	initConf()
+	initLog()
 	initSession()
+}
+
+// init flag
+func initFlag()  {
+	flag.Parse()
 }
 
 // init dir and path
@@ -48,9 +62,20 @@ func initPath() {
 }
 
 // init config
-func initDefaultConf()  {
-	Conf.SetConfigType("toml")
-	Conf.SetConfigFile("config.toml")
+func initConf()  {
+	Conf.SetConfigType(*confType)
+	Conf.SetConfigFile(*conf)
+
+	err := Conf.ReadInConfig()
+	if err != nil {
+		Log.Error("Fatal error config file: "+err.Error())
+		os.Exit(1)
+	}
+
+	file := Conf.ConfigFileUsed()
+	if file != "" {
+		Log.Info("Use config file: " + file)
+	}
 }
 
 // init log
@@ -89,7 +114,13 @@ func initLog() {
 	Log.Attach("file", Log.LoggerLevel(fileLevelStr), fileConfig)
 }
 
-func initSession()  {}
+func initSession()  {
+	err := Session.SetProvider("memory", &memory.Config{})
+	if err != nil {
+		Log.Error("Init session error, "+err.Error())
+		os.Exit(1)
+	}
+}
 
 func SetViewsPath(view string) {
 	ViewPath = RootPath + "/" +view
@@ -111,22 +142,7 @@ func ListenAndServe(addr string, route *Router)  {
 		Log.Infof("listen server %s error: %s", addr, err.Error())
 	}
 }
-
-func checkConf()  {
-	err := Conf.ReadInConfig()
-	if err != nil {
-		Log.Error("Fatal error config file: "+err.Error())
-		os.Exit(1)
-	}
-
-	file := Conf.ConfigFileUsed()
-	if file != "" {
-		Log.Info("Use config file: " + file)
-	}
-}
 func Run() {
-	checkConf()
-	initLog()
 	// start listen server
 	server := Conf.GetString("listen.server")
 	ListenAndServe(server, Route)
