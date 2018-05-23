@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"path"
 	"strings"
+	"bytes"
 )
 
 type ControllerInterface interface {
@@ -24,7 +25,7 @@ type Controller struct {
 	Ctx *fasthttp.RequestCtx
 	ControllerName string
 	ActionName string
-	Data map[string]string
+	Data map[string]interface{}
 }
 
 // init controller
@@ -32,6 +33,7 @@ func (controller *Controller) Init(ctx *fasthttp.RequestCtx, controllerName stri
 	controller.Ctx = ctx
 	controller.ControllerName = controllerName
 	controller.ActionName = actionName
+	controller.Data = map[string]interface{}{}
 }
 
 // controller before
@@ -45,15 +47,38 @@ func (controller *Controller) After() {
 }
 
 // render view response
-func (controller *Controller) Render(path string) {
+func (controller *Controller) Render(tpl string) {
 	controller.Ctx.SetContentType("text/html;charset=utf-8")
-	t, err := template.ParseFiles(ViewPath +"/"+ path + TemplateSuffix)
+	t, err := template.ParseFiles(ViewPath +"/"+ tpl + TemplateSuffix)
 	if err != nil {
-		Log.Errorf("template %s parese error %s", ViewPath+"/"+path, err.Error())
-		controller.Ctx.SetBodyString(err.Error())
-	}else {
-		t.Execute(controller.Ctx.Response.BodyWriter(), controller.Data)
+		Log.Errorf("template %s parese error %s", ViewPath+"/"+tpl, err.Error())
+		controller.Ctx.SetBodyString("template parese error, "+err.Error())
+		return
 	}
+	t.Execute(controller.Ctx.Response.BodyWriter(), controller.Data)
+}
+
+// layout render view response
+func (controller *Controller) LayoutRender(layout string, tpl string) {
+	controller.Ctx.SetContentType("text/html;charset=utf-8")
+
+	var buf bytes.Buffer
+	t, err := template.ParseFiles(ViewPath +"/"+ tpl + TemplateSuffix)
+	if err != nil {
+		Log.Errorf("template %s parese error %s", ViewPath+"/"+tpl, err.Error())
+		controller.Ctx.SetBodyString("template parese error, "+err.Error())
+		return
+	}
+	t.Execute(&buf, controller.Data)
+	controller.Data["LayoutContent"] = template.HTML(buf.String())
+
+	t, err = template.ParseFiles(ViewPath +"/"+ layout + TemplateSuffix)
+	if err != nil {
+		Log.Errorf("template %s parese error %s", ViewPath+"/"+layout, err.Error())
+		controller.Ctx.SetBodyString("template parese error, " +err.Error())
+		return
+	}
+	t.Execute(controller.Ctx.Response.BodyWriter(), controller.Data)
 }
 
 // return json

@@ -3,17 +3,11 @@ package fastgo
 import (
 	"github.com/spf13/viper"
 	"os"
-	"flag"
 	"github.com/phachon/go-logger"
 	"strings"
-	"github.com/kataras/go-sessions"
-	"time"
 	"github.com/valyala/fasthttp"
 	"path"
-)
-
-var (
-	flagConf = flag.String("conf", "config.toml", "please input conf path")
+	"github.com/phachon/fasthttpsession"
 )
 
 var (
@@ -33,56 +27,16 @@ var (
 
 	TemplateSuffix = ".html"
 
-	Session = &sessions.Sessions{}
+	Session = fasthttpsession.NewSession(fasthttpsession.NewDefaultConfig())
 
 	Route = NewRouter()
 )
 
 // start init
 func init()  {
-	initFlag()
-	initConfig()
-	initLog()
 	initPath()
+	initDefaultConf()
 	initSession()
-}
-
-// init flag
-func initFlag() {
-	flag.Parse()
-}
-
-// init config
-func initConfig()  {
-
-	if *flagConf == "" {
-		Log.Error("config file not found!")
-		os.Exit(1)
-	}
-
-	Conf.SetConfigType("toml")
-	Conf.SetConfigFile(*flagConf)
-	err := Conf.ReadInConfig()
-	if err != nil {
-		Log.Error("Fatal error config file: "+err.Error())
-		os.Exit(1)
-	}
-
-	file := Conf.ConfigFileUsed()
-	if(file != "") {
-		Log.Info("Use config file: " + file)
-	}
-}
-
-// init log
-func initLog() {
-
-	Log.Detach("console")
-
-	consoleConfig := &go_logger.ConsoleConfig{
-		Color: true,
-	}
-	Log.Attach("console", go_logger.LOGGER_LEVEL_DEBUG, go_logger.NewConfigConsole(consoleConfig))
 }
 
 // init dir and path
@@ -93,13 +47,49 @@ func initPath() {
 	SetStaticPath("static")
 }
 
-func initSession()  {
-	Session = sessions.New(sessions.Config{
-		Cookie: "fastgossionid",
-		Expires: time.Hour * 2,
-		DisableSubdomainPersistence: false,
-	})
+// init config
+func initDefaultConf()  {
+	Conf.SetConfigType("toml")
+	Conf.SetConfigFile("config.toml")
 }
+
+// init log
+func initLog() {
+
+	Log.Detach("console")
+
+	// console adapter config
+	consoleLevelStr := Conf.GetString("log.console.level")
+	consoleConfig := &go_logger.ConsoleConfig{
+		Color: Conf.GetBool("log.console.color"), // show text color
+		JsonFormat: Conf.GetBool("log.console.jsonFormat"), // text json format
+		Format: Conf.GetString("log.console.format"),
+	}
+	Log.Attach("console", Log.LoggerLevel(consoleLevelStr), consoleConfig)
+
+	// file adapter config
+	fileLevelStr := Conf.GetString("log.file.level")
+	levelFilenameConf := Conf.GetStringMapString("log.file.levelFilename")
+	levelFilename := map[int]string{}
+	if len(levelFilenameConf) > 0 {
+		for levelStr, levelFile := range levelFilenameConf {
+			level := Log.LoggerLevel(levelStr)
+			levelFilename[level] = levelFile
+		}
+	}
+	fileConfig := &go_logger.FileConfig{
+		Filename:  Conf.GetString("log.file.filename"),
+		LevelFileName : levelFilename,
+		MaxSize: Conf.GetInt64("log.file.maxSize"),
+		MaxLine: Conf.GetInt64("log.file.maxLine"),
+		DateSlice: Conf.GetString("log.file.dateSlice"),
+		JsonFormat: Conf.GetBool("log.file.jsonFormat"),
+		Format: Conf.GetString("log.file.format"),
+	}
+	Log.Attach("file", Log.LoggerLevel(fileLevelStr), fileConfig)
+}
+
+func initSession()  {}
 
 func SetViewsPath(view string) {
 	ViewPath = RootPath + "/" +view
@@ -114,7 +104,6 @@ func SetTemplateSuffix(suffix string)  {
 }
 
 func ListenAndServe(addr string, route *Router)  {
-
 	route.Add("GET", "/"+path.Base(StaticPath)+"/*path", NewController(), "Static")
 	Log.Infof("start listen server %s", addr)
 	err := fasthttp.ListenAndServe(addr, route.fastHttpRouter.Handler)
@@ -123,7 +112,21 @@ func ListenAndServe(addr string, route *Router)  {
 	}
 }
 
+func checkConf()  {
+	err := Conf.ReadInConfig()
+	if err != nil {
+		Log.Error("Fatal error config file: "+err.Error())
+		os.Exit(1)
+	}
+
+	file := Conf.ConfigFileUsed()
+	if file != "" {
+		Log.Info("Use config file: " + file)
+	}
+}
 func Run() {
+	checkConf()
+	initLog()
 	// start listen server
 	server := Conf.GetString("listen.server")
 	ListenAndServe(server, Route)
