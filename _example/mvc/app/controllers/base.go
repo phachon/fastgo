@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"github.com/phachon/fastgo"
+	"strings"
+	"github.com/phachon/fastgo/_example/mvc/app/utils"
 )
 
 func NewBaseController() *BaseController {
@@ -10,7 +12,8 @@ func NewBaseController() *BaseController {
 
 type BaseController struct {
 	fastgo.Controller
-	UserConf map[string]string
+	LoginUser map[string]string
+	controller string
 }
 
 type JsonResult struct {
@@ -20,22 +23,62 @@ type JsonResult struct {
 	Redirect map[string]interface{} `json:"redirect"`
 }
 
-func (b *BaseController) Before() {
+func (this *BaseController) Before() {
+	this.controller = strings.ToLower(this.ControllerName[0 : len(this.ControllerName)-10])
+	if this.controller != "author" && !this.isLogin() {
+		this.Ctx.Redirect("/author/index", 302)
+		return
+	}
+}
 
+func (this *BaseController) isLogin() bool {
+	passport := fastgo.Conf.GetString("author.passport")
+
+	cookie := this.GetCookie(passport)
+	// cookie is empty
+	if len(cookie) == 0 {
+		return false
+	}
+	user := this.Session.Get("author")
+	// session is empty
+	if user == nil {
+		return false
+	}
+	cookieValue, _ := utils.Encrypt.Base64Decode(string(cookie))
+	identifyList := strings.Split(cookieValue, "@")
+	if cookieValue == "" || len(identifyList) != 2 {
+		return false
+	}
+	username := identifyList[0]
+	identify := identifyList[1]
+	userValue := user.(map[string]string)
+
+	// cookie session name
+	if username != userValue["username"] {
+		return false
+	}
+	passStr := string(this.UserAgent()) + this.Ctx.RemoteIP().String() + userValue["password"]
+	// UAG and IP
+	if identify != utils.Encrypt.Md5Encode(passStr) {
+		return false
+	}
+	this.LoginUser = userValue
+	// success
+	return true
 }
 
 // return json error
-func (b *BaseController) jsonError(message interface{}, data ...interface{}) {
-	b.jsonResult(0, message, data...)
+func (this *BaseController) jsonError(message interface{}, data ...interface{}) {
+	this.jsonResult(0, message, data...)
 }
 
 // return json success
-func (b *BaseController) jsonSuccess(message interface{}, data ...interface{}) {
-	b.jsonResult(1, message, data...)
+func (this *BaseController) jsonSuccess(message interface{}, data ...interface{}) {
+	this.jsonResult(1, message, data...)
 }
 
 // return json result
-func (b *BaseController) jsonResult(code int, message interface{}, data ...interface{}) {
+func (this *BaseController) jsonResult(code int, message interface{}, data ...interface{}) {
 
 	if message == nil {
 		message = ""
@@ -61,13 +104,9 @@ func (b *BaseController) jsonResult(code int, message interface{}, data ...inter
 			"sleep": sleep,
 		},
 	}
-	b.ReturnJson(res)
+	this.ReturnJson(res)
 }
 
-func (b *BaseController) viewError(message string) {
-	b.Render("error/error")
-}
-
-func (b *BaseController) After() {
-
+func (this *BaseController) viewError(message string) {
+	this.Render("error/error")
 }

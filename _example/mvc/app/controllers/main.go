@@ -10,6 +10,7 @@ type MainController struct {
 
 func (this *MainController) Index() {
 
-	//this.Data["user"] =
-	this.Render("main/index")
+	this.Data["loginUser"] = this.LoginUser
+
+	this.LayoutRender("layouts/default", "main/index")
 }

@@ -1,9 +1,12 @@
 [listen]
-server="127.0.0.1:8090"
+server="127.0.0.1:8081"
 
 [admin]
 username="root"
 password="111111"
+
+[author]
+passport="fastgopassword"
 
 [log.console]
 level="debug"

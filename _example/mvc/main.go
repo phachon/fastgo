@@ -2,20 +2,22 @@ package main
 
 import (
 	"github.com/phachon/fastgo"
-	"fastgo/_example/mvc/app/controllers"
+	"github.com/phachon/fastgo/_example/mvc/app/controllers"
 )
 
 func main() {
 
-	// /author/login
-	fastgo.Route.Add("GET", "/author/login", controllers.NewAuthor(), "Login")
-	// /author/save
-	fastgo.Route.POST("/author/save", controllers.NewAuthor(), "Save")
-	// /main/index
-	fastgo.Route.Get("/main/index", controllers.NewMain(), "Index")
+	author := controllers.NewAuthor()
+	main := controllers.NewMain()
 
-	fastgo.SetStaticPath("static")
-	fastgo.SetViewsPath("views")
+	// login
+	fastgo.Route.GET("/author/index", author, "Index")
+	fastgo.Route.POST("/author/login", author, "Login")
+	fastgo.Route.GET("/author/logout", author, "Logout")
+
+	// main
+	fastgo.Route.GET("/", main, "Index")
+	fastgo.Route.GET("/main/index", main, "Index")
 
 	fastgo.Run()
 }
