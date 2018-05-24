@@ -8,7 +8,7 @@
 [![powered_by](https://img.shields.io/badge/powered_by-Go-3362c2.svg?style=flat)]()
 [![platforms](https://img.shields.io/badge/platform-All-yellow.svg?style=flat)]()
 
-fastgo 是一个基于 fasthttp, fasthttprouter, fastgo 搭建的快速的 Go Web 开发框架!
+fastgo 是一个基于 [fasthttp](https://github.com/valyala/fasthttp), [fasthttprouter](https://github.com/buaazp/fasthttprouter), [fasthttpsession](https://github.com/phachon/fasthttpsession) 搭建的快速的 Go Web 开发框架!
 
 
 # 安装
@@ -58,11 +58,11 @@ func main() {
 
 [完整的 MVC 登录示例](./_example/mvc)
 
-# 包依赖
-- fasthttp
-- fasthttprouter
-- fastgo
-- go-logger
+# 组件
+- [fasthttp](https://github.com/valyala/fasthttp)
+- [fasthttprouter](https://github.com/buaazp/fasthttprouter)
+- [fasthttpsession](https://github.com/phachon/fasthttpsession)
+- [go-logger](https://github.com/phachon/go-logger)
 
 ## 反馈
 
